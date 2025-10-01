@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  dind:
+    image: docker:dind
+    container_name: dind
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: /certs
+    networks:
+      jenkins:
+        aliases:
+          - docker
+    volumes:
+      - docker-certs-ca:/certs/ca
+      - docker-certs-client:/certs/client
+      - docker-cache:/var/lib/docker
+    restart: unless-stopped
+
+  jenkins:
+    image: jenkins/jenkins:lts-jdk17
+    container_name: jenkins
+    user: root
+    depends_on:
+      - dind
+    environment:
+      DOCKER_HOST: "tcp://docker:2376"
+      DOCKER_CERT_PATH: /certs/client
+      DOCKER_TLS_VERIFY: "1"
+      JAVA_OPTS: "-Djenkins.install.runSetupWizard=false"
+      PIPELINE_USER_PASSWORD: "ChangeMe123!"
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      - docker-certs-client:/certs/client:ro
+      - ./jenkins/init.groovy.d/01-security.groovy:/usr/share/jenkins/ref/init.groovy.d/01-security.groovy:ro
+    networks:
+      - jenkins
+    restart: unless-stopped
+
+networks:
+  jenkins: {}
+
+volumes:
+  jenkins-home: {}
+  docker-certs-ca: {}
+  docker-certs-client: {}
+  docker-cache: {}
